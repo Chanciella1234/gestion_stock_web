@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>StockPro — Clients</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+  <link rel="stylesheet" href="/css/style.css">
+  <link rel="stylesheet" href="/css/admin.css">
+  <script src="/js/theme.js"></script>
+  <style>
+    .admin-toolbar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
+    .admin-toolbar .form-control { max-width: 260px; }
+    .client-avatar { width: 32px; height: 32px; border-radius: 50%; background: var(--blue-100); color: var(--blue-400); display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 13px; }
+    .client-cell { display: flex; align-items: center; gap: 10px; }
+    .client-cell .info { }
+    .client-cell .info .name { font-size: 13px; font-weight: 500; color: var(--text-primary); }
+    .client-cell .info .email { font-size: 11px; color: var(--text-muted); }
+    .actions-cell { display: flex; gap: 4px; }
+    .empty-state { text-align: center; padding: 60px 20px; color: var(--text-muted); }
+    .empty-state i { font-size: 36px; margin-bottom: 12px; }
+
+    .client-detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px; }
+    .client-detail-field label { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: .04em; display: block; margin-bottom: 4px; }
+    .client-detail-field .value { font-size: 14px; color: var(--text-primary); }
+    .client-orders { margin-top: 12px; }
+    .client-order { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--bg-600); font-size: 13px; }
+    .client-order:last-child { border-bottom: none; }
+    .client-order .ref { color: var(--blue-400); font-weight: 500; }
+    .client-order .total { font-weight: 500; }
+  </style>
+</head>
+<body data-page="clients">
+  <div class="page-wrapper">
+    <div id="adminSidebar"></div>
+    <div class="main-content">
+      <div class="flex items-center justify-between mb-2">
+        <h1><i class="fas fa-users"></i> Gestion des clients</h1>
+        <span class="badge badge-client" id="totalClients">0 clients</span>
+      </div>
+
+      <div class="admin-toolbar">
+        <input type="text" class="form-control" id="searchClient" placeholder="Rechercher un client..." style="max-width:260px">
+      </div>
+
+      <div class="table-wrap">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Client</th>
+              <th>Email</th>
+              <th>Commandes</th>
+              <th>Depuis</th>
+              <th>Statut</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="clientsTableBody">
+            <tr><td colspan="6" class="text-center text-muted">Chargement...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal Détail Client -->
+  <div class="modal-overlay" id="modalClient" style="display:none">
+    <div class="modal" style="max-width:600px">
+      <div class="modal-header">
+        <span class="modal-title" id="modalClientTitle">Détails du client</span>
+        <button class="modal-close" onclick="fermerModal('modalClient')">&times;</button>
+      </div>
+      <div class="modal-body" id="modalClientBody">
+        <div class="client-detail-grid" id="clientDetailInfo"></div>
+        <h4 style="font-size:13px;color:var(--text-secondary);margin-bottom:8px"><i class="fas fa-receipt"></i> Historique des commandes</h4>
+        <div class="client-orders" id="clientOrders">
+          <p style="text-align:center;color:var(--text-muted);padding:12px">Aucune commande.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="/js/auth.js"></script>
+  <script src="/js/admin.js"></script>
+  <script>
+    const STATUT_LABELS = {
+      en_attente: 'En attente',
+      confirmee: 'Confirmée',
+      expediee: 'Expédiée',
+      livree: 'Livrée',
+      annulee: 'Annulée'
+    };
+
+    document.addEventListener('DOMContentLoaded', () => {
+      verifierAuth();
+      chargerClientsAdmin();
+      document.getElementById('searchClient').addEventListener('keyup', () => setTimeout(chargerClientsAdmin, 300));
+    });
+
+    function verifierAuth() {
+      const token = localStorage.getItem('token');
+      if (!token) { window.location.href = '/views/auth/login.html'; return; }
+      try {
+        const user = JSON.parse(localStorage.getItem('user'));
+        if (!user || user.role !== 'admin') window.location.href = '/views/produits/catalogue.html';
+      } catch (e) { window.location.href = '/views/auth/login.html'; }
+    }
+
+    function ouvrirModal(id) { document.getElementById(id).style.display = 'flex'; }
+    function fermerModal(id) { document.getElementById(id).style.display = 'none'; }
+    function getToken() { return localStorage.getItem('token'); }
+
+    let clientsCache = [];
+    let commandesCache = [];
+
+    async function chargerClientsAdmin() {
+      const token = getToken();
+      const tbody = document.getElementById('clientsTableBody');
+      const totalEl = document.getElementById('totalClients');
+
+      try {
+        const [clientsRes, cmdRes] = await Promise.all([
+          fetch(API + '/auth/clients', { headers: { 'Authorization': 'Bearer ' + token } }),
+          fetch(API + '/commandes', { headers: { 'Authorization': 'Bearer ' + token } })
+        ]);
+
+        const clientsData = await clientsRes.json();
+        const cmdData = await cmdRes.json();
+
+        commandesCache = cmdData.success ? cmdData.data : [];
+
+        if (clientsData.success) {
+          const clients = clientsData.data;
+
+          // Count orders per client
+          const orderCount = {};
+          commandesCache.forEach(c => {
+            if (c.utilisateur && c.utilisateur._id) {
+              orderCount[c.utilisateur._id] = (orderCount[c.utilisateur._id] || 0) + 1;
+            }
+          });
+
+          clientsCache = clients.map(c => ({
+            ...c,
+            commandes: orderCount[c._id] || 0
+          }));
+
+          if (totalEl) totalEl.textContent = clients.length + ' client' + (clients.length > 1 ? 's' : '');
+
+          const searchVal = document.getElementById('searchClient').value.toLowerCase();
+          let filtered = clientsCache;
+          if (searchVal) filtered = filtered.filter(c => c.nom.toLowerCase().includes(searchVal) || c.email.toLowerCase().includes(searchVal));
+
+          if (filtered.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted">' + (searchVal ? 'Aucun client trouvé.' : 'Aucun client pour le moment.') + '</td></tr>';
+            return;
+          }
+
+          tbody.innerHTML = filtered.map(c => {
+            const initiale = c.nom.charAt(0).toUpperCase();
+            const date = c.date_inscription ? new Date(c.date_inscription).toLocaleDateString('fr-FR') : '—';
+            return `
+              <tr>
+                <td>
+                  <div class="client-cell">
+                    <div class="client-avatar">${initiale}</div>
+                    <div class="info">
+                      <div class="name">${c.nom}</div>
+                      <div class="email">${c.email}</div>
+                    </div>
+                  </div>
+                </td>
+                <td>${c.email}</td>
+                <td>${c.commandes} commande${c.commandes > 1 ? 's' : ''}</td>
+                <td>${date}</td>
+                <td><span class="badge badge-client">Client</span></td>
+                <td class="actions-cell">
+                  <button class="btn btn-secondary btn-sm" onclick="ouvrirDetailClient('${c._id}')"><i class="fas fa-eye"></i> Voir</button>
+                </td>
+              </tr>
+            `;
+          }).join('');
+        } else {
+          if (tbody) tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted">Erreur de chargement des clients.</td></tr>';
+        }
+      } catch (e) {
+        if (tbody) tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted">Erreur de chargement.</td></tr>';
+      }
+    }
+
+    function ouvrirDetailClient(clientId) {
+      const client = clientsCache.find(c => c._id === clientId);
+      if (!client) return;
+
+      const initiale = client.nom.charAt(0).toUpperCase();
+      const date = client.date_inscription ? new Date(client.date_inscription).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' }) : '—';
+
+      document.getElementById('modalClientTitle').textContent = client.nom;
+
+      document.getElementById('clientDetailInfo').innerHTML = `
+        <div class="client-detail-field" style="grid-column:1/-1;text-align:center;margin-bottom:8px">
+          <div style="width:48px;height:48px;border-radius:50%;background:var(--blue-100);color:var(--blue-400);display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:600;margin:0 auto 8px">${initiale}</div>
+        </div>
+        <div class="client-detail-field">
+          <label>Nom</label>
+          <div class="value">${client.nom}</div>
+        </div>
+        <div class="client-detail-field">
+          <label>Email</label>
+          <div class="value">${client.email}</div>
+        </div>
+        <div class="client-detail-field">
+          <label>Clients depuis</label>
+          <div class="value">${date}</div>
+        </div>
+        <div class="client-detail-field">
+          <label>Total commandes</label>
+          <div class="value">${client.commandes}</div>
+        </div>
+      `;
+
+      const clientOrders = commandesCache.filter(c => c.utilisateur && c.utilisateur._id === clientId);
+      const ordersContainer = document.getElementById('clientOrders');
+      if (clientOrders.length === 0) {
+        ordersContainer.innerHTML = '<p style="text-align:center;color:var(--text-muted);padding:12px">Aucune commande.</p>';
+      } else {
+        ordersContainer.innerHTML = clientOrders.map(c => {
+          const ref = c._id.toString().slice(-6).toUpperCase();
+          const d = new Date(c.createdAt).toLocaleDateString('fr-FR');
+          const badgeClass = c.statut === 'en_attente' ? 'badge-pending' : (c.statut === 'confirmee' ? 'badge-confirmed' : (c.statut === 'expediee' ? 'badge-shipped' : (c.statut === 'livree' ? 'badge-delivered' : 'badge-cancelled')));
+          return `
+            <div class="client-order">
+              <div>
+                <span class="ref">#${ref}</span>
+                <span class="badge ${badgeClass}" style="margin-left:8px">${STATUT_LABELS[c.statut] || c.statut}</span>
+              </div>
+              <div>
+                <span style="color:var(--text-muted);font-size:12px;margin-right:12px">${d}</span>
+                <span class="total">${c.montant_total.toFixed(2)}FBU</span>
+              </div>
+            </div>
+          `;
+        }).join('');
+      }
+
+      ouvrirModal('modalClient');
+    }
+  </script>
+</body>
+</html>

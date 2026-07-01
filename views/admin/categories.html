@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>StockPro — Catégories</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+  <link rel="stylesheet" href="/css/style.css">
+  <link rel="stylesheet" href="/css/admin.css">
+  <script src="/js/theme.js"></script>
+  <style>
+    .admin-toolbar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
+    .categories-grid { margin-top: 0; }
+    .categorie-produits { margin-top: 16px; }
+  </style>
+</head>
+<body data-page="categories">
+  <div class="page-wrapper">
+    <div id="adminSidebar"></div>
+    <div class="main-content">
+      <div class="flex items-center justify-between mb-2">
+        <h1><i class="fas fa-tags"></i> Gestion des catégories</h1>
+      </div>
+
+      <div class="admin-toolbar">
+        <button class="btn btn-primary btn-sm" onclick="ouvrirModalCategorie(null)"><i class="fas fa-plus"></i> Nouvelle catégorie</button>
+        <input type="text" class="form-control" id="searchCategorie" placeholder="Rechercher..." style="max-width:200px">
+      </div>
+
+      <div class="categories-grid" id="categoriesGrid">
+        <div style="grid-column:1/-1;text-align:center;padding:40px;color:var(--text-muted)">
+          <i class="fas fa-spinner fa-spin" style="font-size:28px"></i>
+          <p style="margin-top:12px">Chargement...</p>
+        </div>
+      </div>
+
+      <div id="categorieProduits" class="categorie-produits"></div>
+
+      <!-- Modal Catégorie -->
+      <div class="modal-overlay" id="modalCategorie" style="display:none">
+        <div class="modal">
+          <div class="modal-header">
+            <span class="modal-title" id="modalCategorieTitle">Nouvelle catégorie</span>
+            <button class="modal-close" onclick="fermerModal('modalCategorie')">&times;</button>
+          </div>
+          <input type="hidden" id="categorieId">
+          <div class="form-group">
+            <label class="form-label">Nom</label>
+            <input type="text" class="form-control" id="cNom" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Description</label>
+            <textarea class="form-control" id="cDescription" rows="3"></textarea>
+          </div>
+          <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="fermerModal('modalCategorie')">Annuler</button>
+            <button class="btn btn-primary" id="btnSaveCategorie"><i class="fas fa-save"></i> Enregistrer</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="/js/auth.js"></script>
+  <script src="/js/navbar.js"></script>
+  <script src="/js/admin.js"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      verifierAuth();
+      chargerCategoriesAdmin();
+      document.getElementById('searchCategorie').addEventListener('keyup', () => setTimeout(chargerCategoriesAdmin, 300));
+      document.getElementById('btnSaveCategorie').addEventListener('click', sauvegarderCategorie);
+    });
+
+    function verifierAuth() {
+      const token = localStorage.getItem('token');
+      if (!token) { window.location.href = '/views/auth/login.html'; return; }
+      try {
+        const user = JSON.parse(localStorage.getItem('user'));
+        if (!user || user.role !== 'admin') window.location.href = '/views/produits/catalogue.html';
+      } catch (e) { window.location.href = '/views/auth/login.html'; }
+    }
+
+    function ouvrirModal(id) { document.getElementById(id).style.display = 'flex'; }
+    function fermerModal(id) { document.getElementById(id).style.display = 'none'; }
+    function getToken() { return localStorage.getItem('token'); }
+
+    async function chargerCategoriesAdmin() {
+      const container = document.getElementById('categoriesGrid');
+      if (!container) return;
+
+      try {
+        const res = await fetch(API + '/categories');
+        const data = await res.json();
+
+        if (data.success) {
+          const prodsRes = await fetch(API + '/produits?limit=500');
+          const prodsData = await prodsRes.json();
+          const produits = prodsData.success ? prodsData.data : [];
+
+          const searchVal = document.getElementById('searchCategorie').value.toLowerCase();
+          let categories = data.data;
+          if (searchVal) categories = categories.filter(c => c.nom.toLowerCase().includes(searchVal));
+
+          if (categories.length === 0) {
+            container.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:40px;color:var(--text-muted)"><i class="fas fa-tags" style="font-size:36px;margin-bottom:12px"></i><p>' + (searchVal ? 'Aucune catégorie trouvée.' : 'Aucune catégorie.') + '</p></div>';
+            return;
+          }
+
+          container.innerHTML = categories.map(c => {
+            const count = produits.filter(p => p.categorie && (p.categorie._id === c._id || p.categorie === c._id)).length;
+            return `
+              <div class="categorie-card" onclick="afficherProduitsCategorie('${c._id}', '${c.nom}')">
+                <div class="categorie-icon"><i class="fas fa-tag"></i></div>
+                <div class="categorie-nom">${c.nom}</div>
+                ${c.description ? `<div style="font-size:11px;color:var(--text-muted);margin-bottom:4px">${c.description}</div>` : ''}
+                <div class="categorie-count">${count} produit${count > 1 ? 's' : ''}</div>
+                <div class="categorie-bar" style="width:${Math.min(100, (count || 1) * 20)}%"></div>
+                <div style="margin-top:8px;display:flex;gap:4px;justify-content:center">
+                  <button class="btn btn-secondary btn-sm" onclick="event.stopPropagation();editerCategorie('${c._id}')"><i class="fas fa-edit"></i></button>
+                  <button class="btn btn-danger btn-sm" onclick="event.stopPropagation();supprimerCategorie('${c._id}')"><i class="fas fa-trash"></i></button>
+                </div>
+              </div>
+            `;
+          }).join('');
+        }
+      } catch (e) {}
+    }
+
+    let categorieProduitsCache = [];
+
+    async function afficherProduitsCategorie(catId, catNom) {
+      const container = document.getElementById('categorieProduits');
+      try {
+        const res = await fetch(API + '/produits?categorie=' + catId + '&limit=50');
+        const data = await res.json();
+        if (data.success) {
+          categorieProduitsCache = data.data;
+          container.innerHTML = `
+            <div class="card">
+              <div class="card-header">
+                <span class="card-title"><i class="fas fa-tag"></i> ${catNom} — ${data.data.length} produit${data.data.length > 1 ? 's' : ''}</span>
+                <button class="btn btn-ghost btn-sm" onclick="document.getElementById('categorieProduits').innerHTML=''"><i class="fas fa-times"></i> Fermer</button>
+              </div>
+              ${data.data.length === 0 ? '<p style="padding:12px;color:var(--text-muted)">Aucun produit dans cette catégorie.</p>' : `
+              <div class="table-wrap">
+                <table class="table">
+                  <thead><tr><th>Nom</th><th>Prix</th><th>Stock</th><th>Statut</th></tr></thead>
+                  <tbody>
+                    ${data.data.map(p => `
+                      <tr>
+                        <td>${p.nom}</td>
+                        <td>${p.prix.toFixed(2)}FBU</td>
+                        <td>${p.stock}</td>
+                        <td><span class="badge ${p.stock === 0 ? 'badge-stock-out' : (p.alerte_active ? 'badge-stock-low' : 'badge-stock-ok')}">${p.stock === 0 ? 'Rupture' : (p.alerte_active ? 'Stock faible' : 'OK')}</span></td>
+                      </tr>
+                    `).join('')}
+                  </tbody>
+                </table>
+              </div>
+              `}
+            </div>
+          `;
+        }
+      } catch (e) {}
+    }
+
+    function editerCategorie(id) { ouvrirModalCategorie(id); }
+
+    async function ouvrirModalCategorie(id) {
+      document.getElementById('categorieId').value = '';
+      document.getElementById('cNom').value = '';
+      document.getElementById('cDescription').value = '';
+      document.getElementById('modalCategorieTitle').textContent = 'Nouvelle catégorie';
+
+      if (id) {
+        document.getElementById('modalCategorieTitle').textContent = 'Modifier la catégorie';
+        try {
+          const res = await fetch(API + '/categories/' + id, { headers: { 'Authorization': 'Bearer ' + getToken() } });
+          const data = await res.json();
+          if (data.success) {
+            document.getElementById('categorieId').value = data.data._id;
+            document.getElementById('cNom').value = data.data.nom;
+            document.getElementById('cDescription').value = data.data.description || '';
+          }
+        } catch (e) {}
+      }
+      ouvrirModal('modalCategorie');
+    }
+
+    async function sauvegarderCategorie() {
+      const id = document.getElementById('categorieId').value;
+      const token = getToken();
+      const nom = document.getElementById('cNom').value.trim();
+      if (!nom) { alert('Le nom de la catégorie est requis.'); return; }
+      const body = {
+        nom,
+        description: document.getElementById('cDescription').value
+      };
+
+      const url = id ? API + '/categories/' + id : API + '/categories';
+      const method = id ? 'PUT' : 'POST';
+
+      try {
+        const res = await fetch(url, {
+          method,
+          headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+          body: JSON.stringify(body)
+        });
+        const data = await res.json();
+        if (data.success) {
+          fermerModal('modalCategorie');
+          chargerCategoriesAdmin();
+        } else {
+          alert(data.message);
+        }
+      } catch (e) {
+        alert('Erreur lors de la sauvegarde.');
+      }
+    }
+
+    async function supprimerCategorie(id) {
+      if (!await confirmAsync('Supprimer cette catégorie ? Les produits associés ne seront pas supprimés.')) return;
+      try {
+        const res = await fetch(API + '/categories/' + id, {
+          method: 'DELETE',
+          headers: { 'Authorization': 'Bearer ' + getToken() }
+        });
+        const data = await res.json();
+        if (data.success) {
+          chargerCategoriesAdmin();
+        } else {
+          alert(data.message);
+        }
+      } catch (e) {}
+    }
+  </script>
+</body>
+</html>

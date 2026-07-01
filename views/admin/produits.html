@@ -1,0 +1,507 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>StockPro — Produits</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+  <link rel="stylesheet" href="/css/style.css">
+  <link rel="stylesheet" href="/css/admin.css">
+  <script src="/js/theme.js"></script>
+  <style>
+    .admin-tabs { display: flex; gap: 0; margin-bottom: 20px; background: var(--bg-700); border: 1px solid var(--border); border-radius: var(--radius-lg); overflow: hidden; }
+    .admin-tab { padding: 10px 24px; font-size: 13px; font-weight: 500; color: var(--text-secondary); cursor: pointer; transition: all .15s; border-right: 1px solid var(--border); }
+    .admin-tab:last-child { border-right: none; }
+    .admin-tab:hover { color: var(--text-primary); background: var(--bg-600); }
+    .admin-tab.active { color: var(--text-primary); background: var(--bg-500); }
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+    .admin-toolbar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
+    .admin-toolbar .form-control { max-width: 200px; }
+    .admin-produits-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; }
+    .admin-produit-card { background: var(--bg-700); border: 1px solid var(--border); border-radius: var(--radius-lg); overflow: hidden; transition: border-color .2s; position: relative; }
+    .admin-produit-card:hover { border-color: var(--blue-500); }
+    .admin-produit-img { height: 140px; background: var(--bg-600); display: flex; align-items: center; justify-content: center; font-size: 36px; color: var(--text-muted); }
+    .admin-produit-img img { width: 100%; height: 100%; object-fit: cover; }
+    .admin-produit-body { padding: 12px; }
+    .admin-produit-cat { font-size: 11px; color: var(--text-muted); margin-bottom: 2px; }
+    .admin-produit-nom { font-size: 14px; font-weight: 500; margin-bottom: 4px; }
+    .admin-produit-prix { font-size: 16px; font-weight: 600; color: var(--blue-400); margin-bottom: 6px; }
+    .admin-produit-actions { display: flex; gap: 4px; margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border); }
+    .admin-produit-actions .btn { padding: 4px 8px; font-size: 12px; }
+    .categories-grid { margin-top: 16px; }
+    .categorie-produits { margin-top: 16px; }
+    .progress-mini { height: 4px; border-radius: 2px; background: var(--bg-600); overflow: hidden; margin-top: 8px; }
+    .progress-mini .bar { height: 100%; border-radius: 2px; background: var(--blue-500); }
+  </style>
+</head>
+<body data-page="produits">
+  <div class="page-wrapper">
+    <div id="adminSidebar"></div>
+    <div class="main-content">
+      <h1 class="mb-2"><i class="fas fa-boxes"></i> Gestion des produits</h1>
+
+      <!-- Tabs -->
+      <div class="admin-tabs">
+        <div class="admin-tab active" data-tab="produits"><i class="fas fa-box"></i> Produits</div>
+        <div class="admin-tab" data-tab="categories"><i class="fas fa-tags"></i> Catégories</div>
+      </div>
+
+      <!-- Produits Tab -->
+      <div class="tab-content active" id="tab-produits">
+        <div class="admin-toolbar">
+          <button class="btn btn-primary btn-sm" onclick="ouvrirModalProduit(null)"><i class="fas fa-plus"></i> Nouveau produit</button>
+          <input type="text" class="form-control" id="searchProduit" placeholder="Rechercher..." style="max-width:200px">
+          <select class="form-control" id="filterCategorie" style="max-width:180px">
+            <option value="">Toutes catégories</option>
+          </select>
+        </div>
+        <div class="admin-produits-grid" id="produitsGrid">
+          <div style="grid-column:1/-1;text-align:center;padding:40px;color:var(--text-muted)">
+            <i class="fas fa-spinner fa-spin" style="font-size:28px"></i>
+            <p style="margin-top:12px">Chargement...</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Categories Tab -->
+      <div class="tab-content" id="tab-categories">
+        <div class="admin-toolbar">
+          <button class="btn btn-primary btn-sm" onclick="ouvrirModalCategorie(null)"><i class="fas fa-plus"></i> Nouvelle catégorie</button>
+        </div>
+        <div class="categories-grid" id="categoriesGrid"></div>
+        <div id="categorieProduits" class="categorie-produits"></div>
+      </div>
+
+      <!-- Modal Produit -->
+      <div class="modal-overlay" id="modalProduit" style="display:none">
+        <div class="modal">
+          <div class="modal-header">
+            <span class="modal-title" id="modalProduitTitle">Nouveau produit</span>
+            <button class="modal-close" onclick="fermerModal('modalProduit')">&times;</button>
+          </div>
+          <input type="hidden" id="produitId">
+          <div class="form-group">
+            <label class="form-label">Nom</label>
+            <input type="text" class="form-control" id="pNom" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Description</label>
+            <textarea class="form-control" id="pDescription" rows="3"></textarea>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Prix (FBU)</label>
+            <input type="number" class="form-control" id="pPrix" step="0.01" min="0" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Stock</label>
+            <input type="number" class="form-control" id="pStock" min="0" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Seuil d'alerte</label>
+            <input type="number" class="form-control" id="pSeuil" min="0" value="5">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Catégorie</label>
+            <select class="form-control" id="pCategorie"></select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Image</label>
+            <input type="file" class="form-control" id="pImage" accept="image/*">
+          </div>
+          <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="fermerModal('modalProduit')">Annuler</button>
+            <button class="btn btn-primary" id="btnSaveProduit"><i class="fas fa-save"></i> Enregistrer</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Modal Catégorie -->
+      <div class="modal-overlay" id="modalCategorie" style="display:none">
+        <div class="modal">
+          <div class="modal-header">
+            <span class="modal-title" id="modalCategorieTitle">Nouvelle catégorie</span>
+            <button class="modal-close" onclick="fermerModal('modalCategorie')">&times;</button>
+          </div>
+          <input type="hidden" id="categorieId">
+          <div class="form-group">
+            <label class="form-label">Nom</label>
+            <input type="text" class="form-control" id="cNom" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Description</label>
+            <textarea class="form-control" id="cDescription" rows="3"></textarea>
+          </div>
+          <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="fermerModal('modalCategorie')">Annuler</button>
+            <button class="btn btn-primary" id="btnSaveCategorie"><i class="fas fa-save"></i> Enregistrer</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="/js/auth.js"></script>
+  <script src="/js/navbar.js"></script>
+  <script src="/js/admin.js"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      verifierAuth();
+      chargerProduitsAdmin();
+      chargerCategoriesAdmin();
+      initialiserTabs();
+
+      document.getElementById('btnSaveProduit').addEventListener('click', sauvegarderProduit);
+      document.getElementById('btnSaveCategorie').addEventListener('click', sauvegarderCategorie);
+      document.getElementById('searchProduit').addEventListener('keyup', () => setTimeout(chargerProduitsAdmin, 300));
+      document.getElementById('filterCategorie').addEventListener('change', chargerProduitsAdmin);
+    });
+
+    function verifierAuth() {
+      const token = localStorage.getItem('token');
+      if (!token) { window.location.href = '/views/auth/login.html'; return; }
+      try {
+        const user = JSON.parse(localStorage.getItem('user'));
+        if (!user || user.role !== 'admin') window.location.href = '/views/produits/catalogue.html';
+      } catch (e) { window.location.href = '/views/auth/login.html'; }
+    }
+
+    function ouvrirModal(id) { document.getElementById(id).style.display = 'flex'; }
+    function fermerModal(id) { document.getElementById(id).style.display = 'none'; }
+    function getToken() { return localStorage.getItem('token'); }
+
+    function initialiserTabs() {
+      document.querySelectorAll('.admin-tab').forEach(tab => {
+        tab.addEventListener('click', () => {
+          document.querySelectorAll('.admin-tab').forEach(t => t.classList.remove('active'));
+          document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+          tab.classList.add('active');
+          document.getElementById('tab-' + tab.dataset.tab).classList.add('active');
+        });
+      });
+    }
+
+    // ─── PRODUITS ──────────────────────────────────────
+
+    async function chargerProduitsAdmin() {
+      const token = getToken();
+      const grid = document.getElementById('produitsGrid');
+      const catSelect = document.getElementById('filterCategorie');
+
+      if (catSelect && catSelect.options.length <= 1) {
+        try {
+          const catRes = await fetch(API + '/categories');
+          const catData = await catRes.json();
+          if (catData.success) {
+            catSelect.innerHTML = '<option value="">Toutes catégories</option>' +
+              catData.data.map(c => `<option value="${c._id}">${c.nom}</option>`).join('');
+            catSelect.addEventListener('change', chargerProduitsAdmin);
+          }
+        } catch (e) {}
+      }
+
+      try {
+        const prodRes = await fetch(API + '/produits?limit=200', {
+          headers: { 'Authorization': 'Bearer ' + token }
+        });
+        const prodData = await prodRes.json();
+
+        if (prodData.success && grid) {
+          const catFilter = catSelect ? catSelect.value : '';
+          const searchVal = document.getElementById('searchProduit').value.toLowerCase();
+
+          let produits = prodData.data;
+          if (catFilter) produits = produits.filter(p => p.categorie && (p.categorie._id === catFilter || p.categorie === catFilter));
+          if (searchVal) produits = produits.filter(p => p.nom.toLowerCase().includes(searchVal));
+
+          if (produits.length === 0) {
+            grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:60px 20px;color:var(--text-muted)"><i class="fas fa-box-open" style="font-size:36px;margin-bottom:12px"></i><p>' + (searchVal ? 'Aucun produit trouvé.' : 'Aucun produit.') + '</p></div>';
+            return;
+          }
+
+          grid.innerHTML = produits.map(p => {
+            const imgHtml = p.image && p.image !== 'default-product.png'
+              ? `<img src="/images/${p.image}" alt="${p.nom}">`
+              : `<i class="fas fa-box-open"></i>`;
+            const badgeClass = p.stock === 0 ? 'badge-stock-out' : (p.alerte_active ? 'badge-stock-low' : 'badge-stock-ok');
+            const badgeText = p.stock === 0 ? 'Rupture' : (p.alerte_active ? 'Stock faible' : 'OK');
+            return `
+              <div class="admin-produit-card">
+                <div class="admin-produit-img">${imgHtml}</div>
+                <div class="admin-produit-body">
+                  <div class="admin-produit-cat">${p.categorie ? (p.categorie.nom || '—') : '—'}</div>
+                  <div class="admin-produit-nom">${p.nom}</div>
+                  <div class="admin-produit-prix">${p.prix.toFixed(2)}FBU</div>
+                  <div><span class="badge ${badgeClass}">${badgeText}</span> <span style="font-size:12px;color:var(--text-muted)">Stock: ${p.stock}</span></div>
+                  <div class="admin-produit-actions">
+                    <button class="btn btn-secondary btn-sm" onclick="ouvrirModalProduit('${p._id}')"><i class="fas fa-edit"></i> Modifier</button>
+                    <button class="btn btn-danger btn-sm" onclick="supprimerProduit('${p._id}')"><i class="fas fa-trash"></i></button>
+                  </div>
+                </div>
+              </div>
+            `;
+          }).join('');
+        }
+      } catch (e) {}
+    }
+
+    async function ouvrirModalProduit(id) {
+      const modal = document.getElementById('modalProduit');
+      const title = document.getElementById('modalProduitTitle');
+      const form = document.getElementById('produitForm');
+      document.getElementById('produitId').value = '';
+      document.getElementById('pNom').value = '';
+      document.getElementById('pDescription').value = '';
+      document.getElementById('pPrix').value = '';
+      document.getElementById('pStock').value = '';
+      document.getElementById('pSeuil').value = '5';
+      document.getElementById('pImage').value = '';
+
+      if (title) title.textContent = 'Nouveau produit';
+
+      const catSelect = document.getElementById('pCategorie');
+      try {
+        const res = await fetch(API + '/categories');
+        const data = await res.json();
+        if (data.success) {
+          catSelect.innerHTML = data.data.map(c => `<option value="${c._id}">${c.nom}</option>`).join('');
+        }
+      } catch (e) {}
+
+      if (id) {
+        if (title) title.textContent = 'Modifier le produit';
+        try {
+          const res = await fetch(API + '/produits/' + id, { headers: { 'Authorization': 'Bearer ' + getToken() } });
+          const data = await res.json();
+          if (data.success) {
+            const p = data.data;
+            document.getElementById('produitId').value = p._id;
+            document.getElementById('pNom').value = p.nom;
+            document.getElementById('pDescription').value = p.description || '';
+            document.getElementById('pPrix').value = p.prix;
+            document.getElementById('pStock').value = p.stock;
+            document.getElementById('pSeuil').value = p.seuil_alerte;
+            if (p.categorie) catSelect.value = typeof p.categorie === 'object' ? p.categorie._id : p.categorie;
+          }
+        } catch (e) {}
+      }
+
+      ouvrirModal('modalProduit');
+    }
+
+    async function sauvegarderProduit() {
+      const id = document.getElementById('produitId').value;
+      const token = getToken();
+
+      const nom = document.getElementById('pNom').value.trim();
+      const prix = parseFloat(document.getElementById('pPrix').value);
+      const stock = parseInt(document.getElementById('pStock').value);
+      const seuil = parseInt(document.getElementById('pSeuil').value);
+      const catId = document.getElementById('pCategorie').value;
+
+      if (!nom) { alert('Le nom du produit est requis.'); return; }
+      if (isNaN(prix) || prix < 0) { alert('Prix invalide.'); return; }
+      if (isNaN(stock) || stock < 0) { alert('Stock invalide.'); return; }
+      if (isNaN(seuil) || seuil < 0) { alert('Seuil invalide.'); return; }
+      if (!catId) { alert('Veuillez sélectionner une catégorie.'); return; }
+
+      const body = new FormData();
+      body.append('nom', nom);
+      body.append('description', document.getElementById('pDescription').value);
+      body.append('prix', prix);
+      body.append('stock', stock);
+      body.append('seuil_alerte', seuil);
+      body.append('categorie', catId);
+
+      const fileInput = document.getElementById('pImage');
+      if (fileInput.files.length > 0) {
+        body.append('image', fileInput.files[0]);
+      }
+
+      const url = id ? API + '/produits/' + id : API + '/produits';
+      const method = id ? 'PUT' : 'POST';
+
+      try {
+        const res = await fetch(url, {
+          method,
+          headers: { 'Authorization': 'Bearer ' + token },
+          body
+        });
+        const data = await res.json();
+        if (data.success) {
+          fermerModal('modalProduit');
+          chargerProduitsAdmin();
+        } else {
+          alert(data.message);
+        }
+      } catch (e) {
+        alert('Erreur lors de la sauvegarde.');
+      }
+    }
+
+    async function supprimerProduit(id) {
+      if (!await confirmAsync('Supprimer ce produit ?')) return;
+      try {
+        const res = await fetch(API + '/produits/' + id, {
+          method: 'DELETE',
+          headers: { 'Authorization': 'Bearer ' + getToken() }
+        });
+        const data = await res.json();
+        if (data.success) chargerProduitsAdmin();
+        else alert(data.message);
+      } catch (e) {}
+    }
+
+    // ─── CATÉGORIES ────────────────────────────────────
+
+    async function chargerCategoriesAdmin() {
+      const container = document.getElementById('categoriesGrid');
+      if (!container) return;
+
+      try {
+        const res = await fetch(API + '/categories');
+        const data = await res.json();
+
+        if (data.success) {
+          const prodsRes = await fetch(API + '/produits?limit=500');
+          const prodsData = await prodsRes.json();
+          const produits = prodsData.success ? prodsData.data : [];
+
+          if (data.data.length === 0) {
+            container.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:20px;color:var(--text-muted)">Aucune catégorie.</div>';
+            return;
+          }
+
+          container.innerHTML = data.data.map(c => {
+            const count = produits.filter(p => p.categorie && (p.categorie._id === c._id || p.categorie === c._id)).length;
+            return `
+              <div class="categorie-card" onclick="afficherProduitsCategorie('${c._id}', '${c.nom}')">
+                <div class="categorie-icon"><i class="fas fa-tag"></i></div>
+                <div class="categorie-nom">${c.nom}</div>
+                <div class="categorie-count">${count} produit${count > 1 ? 's' : ''}</div>
+                <div class="categorie-bar" style="width:${Math.min(100, (count || 1) * 20)}%"></div>
+                <div style="margin-top:8px;display:flex;gap:4px">
+                  <button class="btn btn-secondary btn-sm" onclick="event.stopPropagation();editerCategorie('${c._id}')"><i class="fas fa-edit"></i></button>
+                  <button class="btn btn-danger btn-sm" onclick="event.stopPropagation();supprimerCategorie('${c._id}')"><i class="fas fa-trash"></i></button>
+                </div>
+              </div>
+            `;
+          }).join('');
+        }
+      } catch (e) {}
+    }
+
+    let categorieProduitsCache = [];
+
+    async function afficherProduitsCategorie(catId, catNom) {
+      const container = document.getElementById('categorieProduits');
+      try {
+        const res = await fetch(API + '/produits?categorie=' + catId + '&limit=50');
+        const data = await res.json();
+        if (data.success) {
+          categorieProduitsCache = data.data;
+          container.innerHTML = `
+            <div class="card">
+              <div class="card-header">
+                <span class="card-title"><i class="fas fa-tag"></i> ${catNom} — ${data.data.length} produit${data.data.length > 1 ? 's' : ''}</span>
+                <button class="btn btn-ghost btn-sm" onclick="document.getElementById('categorieProduits').innerHTML=''"><i class="fas fa-times"></i> Fermer</button>
+              </div>
+              ${data.data.length === 0 ? '<p style="padding:12px;color:var(--text-muted)">Aucun produit dans cette catégorie.</p>' : `
+              <div class="table-wrap">
+                <table class="table">
+                  <thead><tr><th>Nom</th><th>Prix</th><th>Stock</th><th>Statut</th></tr></thead>
+                  <tbody>
+                    ${data.data.map(p => `
+                      <tr>
+                        <td>${p.nom}</td>
+                        <td>${p.prix.toFixed(2)}FBU</td>
+                        <td>${p.stock}</td>
+                        <td><span class="badge ${p.stock === 0 ? 'badge-stock-out' : (p.alerte_active ? 'badge-stock-low' : 'badge-stock-ok')}">${p.stock === 0 ? 'Rupture' : (p.alerte_active ? 'Stock faible' : 'OK')}</span></td>
+                      </tr>
+                    `).join('')}
+                  </tbody>
+                </table>
+              </div>
+              `}
+            </div>
+          `;
+        }
+      } catch (e) {}
+    }
+
+    function editerCategorie(id) { ouvrirModalCategorie(id); }
+
+    async function ouvrirModalCategorie(id) {
+      document.getElementById('categorieId').value = '';
+      document.getElementById('cNom').value = '';
+      document.getElementById('cDescription').value = '';
+      document.getElementById('modalCategorieTitle').textContent = 'Nouvelle catégorie';
+
+      if (id) {
+        document.getElementById('modalCategorieTitle').textContent = 'Modifier la catégorie';
+        try {
+          const res = await fetch(API + '/categories/' + id, { headers: { 'Authorization': 'Bearer ' + getToken() } });
+          const data = await res.json();
+          if (data.success) {
+            document.getElementById('categorieId').value = data.data._id;
+            document.getElementById('cNom').value = data.data.nom;
+            document.getElementById('cDescription').value = data.data.description || '';
+          }
+        } catch (e) {}
+      }
+      ouvrirModal('modalCategorie');
+    }
+
+    async function sauvegarderCategorie() {
+      const id = document.getElementById('categorieId').value;
+      const token = getToken();
+      const nom = document.getElementById('cNom').value.trim();
+      if (!nom) { alert('Le nom de la catégorie est requis.'); return; }
+      const body = {
+        nom,
+        description: document.getElementById('cDescription').value
+      };
+
+      const url = id ? API + '/categories/' + id : API + '/categories';
+      const method = id ? 'PUT' : 'POST';
+
+      try {
+        const res = await fetch(url, {
+          method,
+          headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+          body: JSON.stringify(body)
+        });
+        const data = await res.json();
+        if (data.success) {
+          fermerModal('modalCategorie');
+          chargerCategoriesAdmin();
+          chargerProduitsAdmin();
+        } else {
+          alert(data.message);
+        }
+      } catch (e) {
+        alert('Erreur lors de la sauvegarde.');
+      }
+    }
+
+    async function supprimerCategorie(id) {
+      if (!await confirmAsync('Supprimer cette catégorie ? Les produits associés ne seront pas supprimés.')) return;
+      try {
+        const res = await fetch(API + '/categories/' + id, {
+          method: 'DELETE',
+          headers: { 'Authorization': 'Bearer ' + getToken() }
+        });
+        const data = await res.json();
+        if (data.success) {
+          chargerCategoriesAdmin();
+          chargerProduitsAdmin();
+        } else {
+          alert(data.message);
+        }
+      } catch (e) {}
+    }
+  </script>
+</body>
+</html>
