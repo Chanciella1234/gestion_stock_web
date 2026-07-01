@@ -315,26 +315,6 @@ http://localhost:5000
 
 ---
 
-## Difficultés rencontrées (extrait)
-
-1. **Relations many-to-many entre Commandes et Produits** — Résolu en utilisant un snapshot embarqué dans les commandes plutôt qu'une référence, ce qui garantit l'immuabilité de l'historique des prix.
-
-2. **Panier persistant avec expiration automatique** — Résolu en utilisant l'index TTL de MongoDB (`expireAfterSeconds: 0`) sur le champ `expire_at`, permettant la suppression automatique sans code supplémentaire.
-
-3. **Trigger automatique des alertes de stock** — Résolu en utilisant le hook `pre('save')` de Mongoose sur le modèle Produit pour mettre à jour `alerte_active`, combiné à une méthode statique `creerSiNecessaire()` appelée après chaque commande.
-
----
-
-## Améliorations possibles
-
-1. **Déploiement cloud** (Render, Railway, Vercel) avec MongoDB Atlas pour rendre l'application accessible en ligne
-2. **Framework frontend** (Vue.js ou React) pour une interface plus réactive et des transitions fluides
-3. **Tests automatisés** avec Jest et Supertest pour couvrir toutes les routes API
-4. **Système de paiement** intégration d'une API de paiement mobile (MTN Mobile Money, Airtel Money)
-5. **Export PDF** des factures de commandes et des rapports de stock
-
----
-
 ## Dépôt Git
 
 ```
