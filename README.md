@@ -237,8 +237,8 @@ GET    /api/dashboard/stats        Statistiques admin      [admin]
 
 ### Étape 1 — Cloner le projet
 ```bash
-git clone https://github.com/Chanciella1234/gestion_stock.git
-cd gestion_stock
+git clone https://github.com/Chanciella1234/gestion_stock_web.git
+cd gestion_stock_web
 ```
 
 ### Étape 2 — Installer les dépendances
@@ -318,7 +318,7 @@ http://localhost:5000
 ## Dépôt Git
 
 ```
-https://github.com/Chanciella1234/gestion_stock.git
+https://github.com/Chanciella1234/gestion_stock_web.git
 ```
 
 ---
