@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>StockPro — Connexion</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+  <link rel="stylesheet" href="/css/style.css">
+  <script src="/js/theme.js" data-default="light"></script>
+  <style>
+    .login-nav { position: fixed; top: 0; left: 0; right: 0; z-index: 100; background: var(--bg-800); border-bottom: 1px solid var(--border); padding: 0 24px; height: 56px; display: flex; align-items: center; }
+    .login-nav a { color: var(--blue-400); font-weight: 500; font-size: 16px; text-decoration: none; }
+    .login-nav a i { margin-right: 8px; }
+    .auth-page { padding-top: 56px; }
+  </style>
+</head>
+<body>
+  <nav class="login-nav">
+    <a href="/"><i class="fas fa-cubes"></i> StockPro</a>
+  </nav>
+
+  <div class="auth-page">
+    <div class="auth-card">
+      <div class="auth-logo"><i class="fas fa-cubes"></i> StockPro</div>
+      <div class="auth-title">Connexion</div>
+
+      <div id="alertMessage"></div>
+
+      <form id="loginForm">
+        <div class="form-group">
+          <label class="form-label" for="email">Email</label>
+          <input type="email" id="email" class="form-control" placeholder="votre@email.com" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="mot_de_passe">Mot de passe</label>
+          <div class="input-group">
+            <input type="password" id="mot_de_passe" class="form-control" placeholder="••••••••" required style="border-top-right-radius:0;border-bottom-right-radius:0">
+            <button type="button" class="btn btn-secondary" style="border-top-left-radius:0;border-bottom-left:0;padding:8px 12px" onclick="togglePassword('mot_de_passe', this)">
+              <i class="fas fa-eye"></i>
+            </button>
+          </div>
+        </div>
+        <button type="submit" id="loginBtn" class="btn btn-primary" style="width:100%;justify-content:center;padding:10px;margin-top:8px">
+          <i class="fas fa-sign-in-alt"></i> Se connecter
+        </button>
+      </form>
+
+      <div style="text-align:center;margin-top:16px;font-size:13px">
+        <span style="color:var(--text-secondary)">Pas encore de compte ?</span>
+        <a href="/views/auth/register.html">S'inscrire</a>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="/js/auth.js"></script>
+  <script>
+    const token = localStorage.getItem('token');
+    if (token) {
+      try {
+        const user = JSON.parse(localStorage.getItem('user'));
+        if (user && user.role === 'admin') window.location.href = '/views/admin/dashboard.html';
+        else if (user) window.location.href = '/views/produits/catalogue.html';
+      } catch (e) {}
+    }
+  </script>
+</body>
+</html>

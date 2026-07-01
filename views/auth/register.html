@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>StockPro — Inscription</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+  <link rel="stylesheet" href="/css/style.css">
+  <script src="/js/theme.js" data-default="light"></script>
+  <style>
+    .login-nav { position: fixed; top: 0; left: 0; right: 0; z-index: 100; background: var(--bg-800); border-bottom: 1px solid var(--border); padding: 0 24px; height: 56px; display: flex; align-items: center; }
+    .login-nav a { color: var(--blue-400); font-weight: 500; font-size: 16px; text-decoration: none; }
+    .login-nav a i { margin-right: 8px; }
+    .auth-page { padding-top: 56px; }
+  </style>
+</head>
+<body>
+  <nav class="login-nav">
+    <a href="/"><i class="fas fa-cubes"></i> StockPro</a>
+  </nav>
+
+  <div class="auth-page">
+    <div class="auth-card">
+      <div class="auth-logo"><i class="fas fa-cubes"></i> StockPro</div>
+      <div class="auth-title">Inscription</div>
+
+      <div id="alertMessage"></div>
+
+      <form id="registerForm">
+        <div class="form-group">
+          <label class="form-label" for="nom">Nom complet</label>
+          <input type="text" id="nom" class="form-control" placeholder="Votre nom" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="email">Email</label>
+          <input type="email" id="email" class="form-control" placeholder="votre@email.com" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="telephone">Téléphone</label>
+          <input type="tel" id="telephone" class="form-control" placeholder="+33 6 XX XX XX XX">
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="adresse">Adresse</label>
+          <input type="text" id="adresse" class="form-control" placeholder="Votre adresse">
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="mot_de_passe">Mot de passe</label>
+          <div class="input-group">
+            <input type="password" id="mot_de_passe" class="form-control" placeholder="Au moins 6 caractères" required minlength="6" style="border-top-right-radius:0;border-bottom-right-radius:0">
+            <button type="button" class="btn btn-secondary" style="border-top-left-radius:0;border-bottom-left:0;padding:8px 12px" onclick="togglePassword('mot_de_passe', this)">
+              <i class="fas fa-eye"></i>
+            </button>
+          </div>
+          <div class="form-hint">Minimum 6 caractères</div>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="mot_de_passe_confirm">Confirmer le mot de passe</label>
+          <div class="input-group">
+            <input type="password" id="mot_de_passe_confirm" class="form-control" placeholder="Retaper le mot de passe" required minlength="6" style="border-top-right-radius:0;border-bottom-right-radius:0">
+            <button type="button" class="btn btn-secondary" style="border-top-left-radius:0;border-bottom-left:0;padding:8px 12px" onclick="togglePassword('mot_de_passe_confirm', this)">
+              <i class="fas fa-eye"></i>
+            </button>
+          </div>
+          <div class="form-error" id="passwordError" style="display:none"></div>
+        </div>
+        <button type="submit" id="registerBtn" class="btn btn-primary" style="width:100%;justify-content:center;padding:10px;margin-top:8px">
+          <i class="fas fa-user-plus"></i> Créer mon compte
+        </button>
+      </form>
+
+      <div style="text-align:center;margin-top:16px;font-size:13px">
+        <span style="color:var(--text-secondary)">Déjà un compte ?</span>
+        <a href="/views/auth/login.html">Connectez-vous</a>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="/js/auth.js"></script>
+  <script>
+    const token = localStorage.getItem('token');
+    if (token) {
+      try {
+        const user = JSON.parse(localStorage.getItem('user'));
+        if (user && user.role === 'admin') window.location.href = '/views/admin/dashboard.html';
+        else if (user) window.location.href = '/views/produits/catalogue.html';
+      } catch (e) {}
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      const registerForm = document.getElementById('registerForm');
+      if (registerForm) {
+        const originalSubmit = registerForm.querySelector('#registerBtn');
+        registerForm.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const password = document.getElementById('mot_de_passe').value;
+          const confirm = document.getElementById('mot_de_passe_confirm').value;
+          const errorEl = document.getElementById('passwordError');
+
+          if (password !== confirm) {
+            errorEl.textContent = 'Les mots de passe ne correspondent pas.';
+            errorEl.style.display = 'block';
+            return;
+          }
+          if (password.length < 6) {
+            errorEl.textContent = 'Le mot de passe doit contenir au moins 6 caractères.';
+            errorEl.style.display = 'block';
+            return;
+          }
+          errorEl.style.display = 'none';
+
+          const btn = document.getElementById('registerBtn');
+          btn.disabled = true;
+          btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Inscription...';
+
+          try {
+            const body = {
+              nom: document.getElementById('nom').value,
+              email: document.getElementById('email').value,
+              mot_de_passe: password
+            };
+            const res = await fetch(API + '/auth/register', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(body)
+            });
+            const data = await res.json();
+            if (data.success) {
+              localStorage.setItem('token', data.data.token);
+              localStorage.setItem('user', JSON.stringify(data.data));
+              const role = data.data.role;
+              window.location.href = role === 'admin' ? '/views/admin/dashboard.html' : '/views/produits/catalogue.html';
+            } else {
+              const container = document.getElementById('alertMessage');
+              if (container) container.innerHTML = '<div class="alert alert-danger">' + data.message + '</div>';
+            }
+          } catch (err) {
+            const container = document.getElementById('alertMessage');
+            if (container) container.innerHTML = '<div class="alert alert-danger">Erreur de connexion au serveur.</div>';
+          } finally {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fas fa-user-plus"></i> Créer mon compte';
+          }
+        });
+      }
+    });
+  </script>
+</body>
+</html>

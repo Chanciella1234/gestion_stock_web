@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>StockPro — Mon Profil</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+  <link rel="stylesheet" href="/css/style.css">
+  <script src="/js/theme.js"></script>
+  <style>
+    .profil-page { padding: 40px 20px; max-width: 800px; margin: 0 auto; }
+    .profil-cover { height: 140px; background: linear-gradient(135deg, var(--blue-500), var(--green-400)); border-radius: var(--radius-lg) var(--radius-lg) 0 0; position: relative; }
+    .profil-card { background: var(--bg-700); border: 1px solid var(--border); border-radius: var(--radius-lg); overflow: hidden; }
+    .profil-card-body { padding: 0 24px 24px; }
+    .profil-avatar { width: 72px; height: 72px; border-radius: 50%; background: var(--blue-100); color: var(--blue-400); display: flex; align-items: center; justify-content: center; font-size: 28px; font-weight: 600; border: 4px solid var(--bg-700); margin-top: -36px; margin-bottom: 16px; }
+    .profil-name { font-size: 22px; font-weight: 600; margin-bottom: 2px; }
+    .profil-role { font-size: 13px; color: var(--text-secondary); margin-bottom: 20px; }
+    .profil-role .badge { font-size: 11px; }
+    .profil-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    .profil-field { }
+    .profil-field label { display: block; font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: .04em; margin-bottom: 4px; }
+    .profil-field .value { font-size: 14px; color: var(--text-primary); font-weight: 500; padding: 8px 12px; background: var(--bg-600); border-radius: var(--radius-md); }
+    .profil-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--border); }
+    .profil-stat { text-align: center; padding: 16px; background: var(--bg-600); border-radius: var(--radius-md); }
+    .profil-stat .number { font-size: 24px; font-weight: 600; color: var(--blue-400); }
+    .profil-stat .label { font-size: 11px; color: var(--text-muted); margin-top: 4px; text-transform: uppercase; }
+    .profil-actions { display: flex; gap: 8px; margin-top: 20px; flex-wrap: wrap; }
+    @media (max-width: 600px) {
+      .profil-grid { grid-template-columns: 1fr; }
+      .profil-stats { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div id="navbar-container"></div>
+
+  <div class="profil-page">
+    <div class="profil-card">
+      <div class="profil-cover"></div>
+      <div class="profil-card-body">
+        <div class="profil-avatar" id="profilAvatar">U</div>
+        <div class="profil-name" id="profilNom">—</div>
+        <div class="profil-role"><span class="badge" id="profilRoleBadge">—</span></div>
+
+        <div class="profil-grid">
+          <div class="profil-field">
+            <label>Email</label>
+            <div class="value" id="profilEmail">—</div>
+          </div>
+          <div class="profil-field">
+            <label>Membre depuis</label>
+            <div class="value" id="profilDate">—</div>
+          </div>
+          <div class="profil-field">
+            <label>Identifiant</label>
+            <div class="value" id="profilId">—</div>
+          </div>
+          <div class="profil-field">
+            <label>Rôle</label>
+            <div class="value" id="profilRole">—</div>
+          </div>
+        </div>
+
+        <div class="profil-stats" id="profilStats">
+          <div class="profil-stat">
+            <div class="number" id="statCommandes">0</div>
+            <div class="label">Commandes</div>
+          </div>
+          <div class="profil-stat">
+            <div class="number" id="statProduits">0</div>
+            <div class="label">Produits vus</div>
+          </div>
+          <div class="profil-stat">
+            <div class="number"><i class="fas fa-star" style="color:var(--amber-400)"></i></div>
+            <div class="label">Membre</div>
+          </div>
+        </div>
+
+        <div class="profil-actions">
+          <a href="/views/produits/catalogue.html" class="btn btn-primary btn-sm" id="profilBoutique"><i class="fas fa-store"></i> Voir la boutique</a>
+          <a href="/views/admin/dashboard.html" class="btn btn-secondary btn-sm" id="profilDashboard" style="display:none"><i class="fas fa-chart-line"></i> Tableau de bord</a>
+          <button class="btn btn-danger btn-sm" id="profilDeleteBtn" style="margin-left:auto"><i class="fas fa-trash"></i> Supprimer mon compte</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="/js/auth.js"></script>
+  <script src="/js/navbar.js"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      const token = getToken();
+      if (!token) { window.location.href = '/views/auth/login.html'; return; }
+
+      const user = getUser();
+      if (!user) { window.location.href = '/views/auth/login.html'; return; }
+
+      chargerProfil(user);
+    });
+
+    async function chargerProfil(user) {
+      // Basic info from localStorage
+      const initiale = (user.nom || 'U').charAt(0).toUpperCase();
+      document.getElementById('profilAvatar').textContent = initiale;
+      document.getElementById('profilNom').textContent = user.nom || '—';
+      document.getElementById('profilEmail').textContent = user.email || '—';
+      document.getElementById('profilId').textContent = user._id || '—';
+
+      const roleLabel = user.role === 'admin' ? 'Administrateur' : 'Client';
+      const roleBadgeClass = user.role === 'admin' ? 'badge-confirmed' : 'badge-client';
+      document.getElementById('profilRole').textContent = roleLabel;
+      document.getElementById('profilRoleBadge').textContent = roleLabel;
+      document.getElementById('profilRoleBadge').className = 'badge ' + roleBadgeClass;
+
+      if (user.role === 'admin') {
+        document.getElementById('profilDashboard').style.display = 'inline-flex';
+      }
+
+      try {
+        const token = getToken();
+
+        // Fetch full profile
+        const res = await fetch(API + '/auth/me', {
+          headers: { 'Authorization': 'Bearer ' + token }
+        });
+        const data = await res.json();
+
+        if (data.success) {
+          const p = data.data;
+          document.getElementById('profilEmail').textContent = p.email || '—';
+          if (p.date_inscription) {
+            const d = new Date(p.date_inscription);
+            document.getElementById('profilDate').textContent = d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' });
+          } else {
+            document.getElementById('profilDate').textContent = '—';
+          }
+        }
+
+        // Fetch order count for clients
+        if (user.role === 'client') {
+          const cmdRes = await fetch(API + '/commandes/mes', {
+            headers: { 'Authorization': 'Bearer ' + token }
+          });
+          const cmdData = await cmdRes.json();
+          if (cmdData.success) {
+            document.getElementById('statCommandes').textContent = cmdData.data.length;
+          }
+        } else {
+          // Admin: get stats
+          const statsRes = await fetch(API + '/dashboard/stats', {
+            headers: { 'Authorization': 'Bearer ' + token }
+          });
+          const statsData = await statsRes.json();
+          if (statsData.success) {
+            document.getElementById('statCommandes').textContent = statsData.data.commandes.total;
+            document.getElementById('statProduits').textContent = statsData.data.stock.totalProduits;
+          }
+        }
+      } catch (e) {}
+
+      // Delete account
+      document.getElementById('profilDeleteBtn').addEventListener('click', async () => {
+        if (!await confirmAsync('Voulez-vous vraiment supprimer votre compte ? Toutes vos données (commandes, panier, avis) seront définitivement effacées.')) return;
+        if (!await confirmAsync('Cette action est irréversible. Confirmez-vous la suppression définitive de votre compte ?')) return;
+        try {
+          const res = await fetch(API + '/auth/compte', {
+            method: 'DELETE',
+            headers: { 'Authorization': 'Bearer ' + getToken() }
+          });
+          const data = await res.json();
+          if (data.success) {
+            localStorage.removeItem('token');
+            localStorage.removeItem('user');
+            localStorage.removeItem('theme');
+            window.location.href = '/views/auth/register.html';
+          } else {
+            await alertAsync(data.message, 'error');
+          }
+        } catch (e) {
+          await alertAsync('Erreur lors de la suppression du compte.', 'error');
+        }
+      });
+    }
+  </script>
+</body>
+</html>

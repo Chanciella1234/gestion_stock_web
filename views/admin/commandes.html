@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>StockPro — Commandes</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+  <link rel="stylesheet" href="/css/style.css">
+  <link rel="stylesheet" href="/css/admin.css">
+  <script src="/js/theme.js"></script>
+  <style>
+    .admin-toolbar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
+    .admin-toolbar .form-control { max-width: 200px; }
+    .actions-cell { display: flex; gap: 4px; }
+    .detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    .detail-section { margin-bottom: 12px; }
+    .detail-section h4 { font-size: 12px; color: var(--text-muted); text-transform: uppercase; letter-spacing: .04em; margin-bottom: 8px; }
+    .detail-section .value { font-size: 14px; color: var(--text-primary); }
+    .detail-produits { margin-top: 12px; }
+    .detail-produit-ligne { display: flex; justify-content: space-between; padding: 6px 0; font-size: 13px; border-bottom: 1px solid var(--bg-600); }
+    .detail-produit-ligne:last-child { border-bottom: none; }
+    .detail-total { display: flex; justify-content: space-between; padding: 10px 0 0; margin-top: 8px; border-top: 1px solid var(--border); font-size: 16px; font-weight: 600; }
+    .detail-total span:last-child { color: var(--blue-400); }
+    .statut-select-wrapper { display: flex; gap: 8px; align-items: center; margin-top: 12px; }
+    .statut-select-wrapper select { flex: 1; }
+
+    .timeline { margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--border); }
+    .timeline h4 { font-size: 12px; color: var(--text-muted); text-transform: uppercase; letter-spacing: .04em; margin-bottom: 12px; }
+    .timeline-item { display: flex; align-items: flex-start; gap: 12px; padding-bottom: 16px; position: relative; }
+    .timeline-item:not(:last-child)::before { content: ''; position: absolute; left: 11px; top: 24px; width: 2px; height: calc(100% - 8px); background: var(--border); }
+    .timeline-dot { width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 10px; flex-shrink: 0; }
+    .timeline-dot.pending { background: var(--bg-500); color: var(--text-secondary); }
+    .timeline-dot.confirmed { background: var(--blue-100); color: var(--blue-400); }
+    .timeline-dot.shipped { background: var(--amber-100); color: var(--amber-400); }
+    .timeline-dot.delivered { background: var(--green-100); color: var(--green-400); }
+    .timeline-dot.cancelled { background: var(--red-100); color: var(--red-400); }
+    .timeline-content { flex: 1; padding-top: 2px; }
+    .timeline-content .label { font-size: 13px; font-weight: 500; color: var(--text-primary); }
+    .timeline-content .time { font-size: 11px; color: var(--text-muted); }
+  </style>
+</head>
+<body data-page="commandes">
+  <div class="page-wrapper">
+    <div id="adminSidebar"></div>
+    <div class="main-content">
+      <h1 class="mb-2"><i class="fas fa-truck"></i> Gestion des commandes</h1>
+
+      <div class="admin-toolbar">
+        <select class="form-control" id="filterStatut" style="max-width:180px">
+          <option value="">Tous les statuts</option>
+          <option value="en_attente">En attente</option>
+          <option value="confirmee">Confirmée</option>
+          <option value="expediee">Expédiée</option>
+          <option value="livree">Livrée</option>
+          <option value="annulee">Annulée</option>
+        </select>
+        <input type="date" class="form-control" id="filterDateDebut" style="max-width:160px">
+        <input type="date" class="form-control" id="filterDateFin" style="max-width:160px">
+        <input type="text" class="form-control" id="searchCommande" placeholder="Rechercher client/réf..." style="max-width:220px">
+      </div>
+
+      <div class="table-wrap">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Référence</th>
+              <th>Client</th>
+              <th>Date</th>
+              <th>Total</th>
+              <th>Articles</th>
+              <th>Statut</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="commandesTableBody">
+            <tr><td colspan="7" class="text-center text-muted">Chargement...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal Détails Commande -->
+  <div class="modal-overlay" id="modalCommande" style="display:none">
+    <div class="modal" style="max-width:600px">
+      <div class="modal-header">
+        <span class="modal-title" id="modalCommandeTitle">Détails de la commande</span>
+        <button class="modal-close" onclick="fermerModal('modalCommande')">&times;</button>
+      </div>
+      <div class="modal-body" id="modalCommandeBody">
+        <div class="detail-grid">
+          <div class="detail-section">
+            <h4>Référence</h4>
+            <div class="value" id="detailReference">—</div>
+          </div>
+          <div class="detail-section">
+            <h4>Date</h4>
+            <div class="value" id="detailDate">—</div>
+          </div>
+          <div class="detail-section">
+            <h4>Client</h4>
+            <div class="value" id="detailClient">—</div>
+          </div>
+          <div class="detail-section">
+            <h4>Email</h4>
+            <div class="value" id="detailEmail">—</div>
+          </div>
+          <div class="detail-section" style="grid-column:1/-1">
+            <h4>Statut actuel</h4>
+            <div class="value" id="detailStatut">—</div>
+          </div>
+        </div>
+        <div class="detail-produits" id="detailProduits"></div>
+        <div class="detail-total">
+          <span>Total</span>
+          <span id="detailTotal">0.00FBU</span>
+        </div>
+        <div class="statut-select-wrapper" id="statutChangeArea">
+          <select class="form-control" id="changeStatutSelect"></select>
+          <button class="btn btn-primary btn-sm" id="btnChangerStatut"><i class="fas fa-check"></i> Mettre à jour</button>
+        </div>
+
+        <div class="timeline" id="timelineContainer">
+          <h4><i class="fas fa-clock"></i> Chronologie des statuts</h4>
+          <div id="timelineContent"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="/js/auth.js"></script>
+  <script src="/js/navbar.js"></script>
+  <script src="/js/admin.js"></script>
+  <script>
+    const STATUT_LABELS = {
+      en_attente: 'En attente',
+      confirmee: 'Confirmée',
+      expediee: 'Expédiée',
+      livree: 'Livrée',
+      annulee: 'Annulée'
+    };
+    const STATUT_TRANSITIONS = {
+      en_attente: ['confirmee', 'annulee'],
+      confirmee: ['expediee', 'annulee'],
+      expediee: ['livree', 'annulee'],
+      livree: [],
+      annulee: []
+    };
+
+    document.addEventListener('DOMContentLoaded', () => {
+      verifierAuth();
+      chargerCommandesAdmin();
+
+      document.getElementById('filterStatut').addEventListener('change', chargerCommandesAdmin);
+      document.getElementById('filterDateDebut').addEventListener('change', chargerCommandesAdmin);
+      document.getElementById('filterDateFin').addEventListener('change', chargerCommandesAdmin);
+      document.getElementById('searchCommande').addEventListener('keyup', () => setTimeout(chargerCommandesAdmin, 300));
+      document.getElementById('btnChangerStatut').addEventListener('click', changerStatutCommande);
+    });
+
+    function verifierAuth() {
+      const token = localStorage.getItem('token');
+      if (!token) { window.location.href = '/views/auth/login.html'; return; }
+      try {
+        const user = JSON.parse(localStorage.getItem('user'));
+        if (!user || user.role !== 'admin') window.location.href = '/views/produits/catalogue.html';
+      } catch (e) { window.location.href = '/views/auth/login.html'; }
+    }
+
+    function ouvrirModal(id) { document.getElementById(id).style.display = 'flex'; }
+    function fermerModal(id) { document.getElementById(id).style.display = 'none'; }
+    function getToken() { return localStorage.getItem('token'); }
+
+    async function chargerCommandesAdmin() {
+      const token = getToken();
+      const tbody = document.getElementById('commandesTableBody');
+
+      try {
+        const res = await fetch(API + '/commandes', {
+          headers: { 'Authorization': 'Bearer ' + token }
+        });
+        const data = await res.json();
+
+        if (data.success && tbody) {
+          const statutFilter = document.getElementById('filterStatut').value;
+          const dateDebut = document.getElementById('filterDateDebut').value;
+          const dateFin = document.getElementById('filterDateFin').value;
+          const searchVal = document.getElementById('searchCommande').value.toLowerCase();
+
+          let commandes = data.data;
+          if (statutFilter) commandes = commandes.filter(c => c.statut === statutFilter);
+          if (dateDebut) commandes = commandes.filter(c => new Date(c.createdAt) >= new Date(dateDebut));
+          if (dateFin) commandes = commandes.filter(c => new Date(c.createdAt) <= new Date(dateFin + 'T23:59:59'));
+          if (searchVal) commandes = commandes.filter(c => {
+            const ref = c._id.toString().slice(-6).toLowerCase();
+            const clientNom = c.utilisateur ? c.utilisateur.nom : '';
+            return ref.includes(searchVal) || clientNom.toLowerCase().includes(searchVal);
+          });
+
+          if (commandes.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted">Aucune commande.</td></tr>';
+            return;
+          }
+
+          tbody.innerHTML = commandes.map(c => {
+            const ref = c._id.toString().slice(-6).toUpperCase();
+            const date = new Date(c.createdAt).toLocaleDateString('fr-FR');
+            const totalArticles = c.lignes ? c.lignes.reduce((a, l) => a + l.quantite, 0) : 0;
+            const clientNom = c.utilisateur ? c.utilisateur.nom : '—';
+            const statutBadge = c.statut === 'en_attente' ? 'badge-pending' : (c.statut === 'confirmee' ? 'badge-confirmed' : (c.statut === 'expediee' ? 'badge-shipped' : (c.statut === 'livree' ? 'badge-delivered' : 'badge-cancelled')));
+            return `
+              <tr>
+                <td><span style="font-weight:500">#${ref}</span></td>
+                <td>${clientNom}</td>
+                <td>${date}</td>
+                <td><span style="font-weight:500;color:var(--blue-400)">${c.montant_total.toFixed(2)}FBU</span></td>
+                <td>${totalArticles} article${totalArticles > 1 ? 's' : ''}</td>
+                <td><span class="badge ${statutBadge}">${STATUT_LABELS[c.statut] || c.statut}</span></td>
+                <td class="actions-cell">
+                  <button class="btn btn-secondary btn-sm" onclick="ouvrirDetailCommande('${c._id}')"><i class="fas fa-eye"></i></button>
+                </td>
+              </tr>
+            `;
+          }).join('');
+        }
+      } catch (e) {}
+    }
+
+    let commandesCache = [];
+
+    async function ouvrirDetailCommande(id) {
+      const token = getToken();
+      try {
+        const res = await fetch(API + '/commandes', {
+          headers: { 'Authorization': 'Bearer ' + token }
+        });
+        const data = await res.json();
+        if (!data.success) return;
+        commandesCache = data.data;
+        const c = data.data.find(cmd => cmd._id === id);
+        if (!c) return;
+
+        const ref = c._id.toString().slice(-6).toUpperCase();
+        const date = new Date(c.createdAt).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+        const clientNom = c.utilisateur ? c.utilisateur.nom : '—';
+        const clientEmail = c.utilisateur ? (c.utilisateur.email || '—') : '—';
+        const statutBadge = c.statut === 'en_attente' ? 'badge-pending' : (c.statut === 'confirmee' ? 'badge-confirmed' : (c.statut === 'expediee' ? 'badge-shipped' : (c.statut === 'livree' ? 'badge-delivered' : 'badge-cancelled')));
+
+        document.getElementById('modalCommandeTitle').textContent = 'Commande #' + ref;
+        document.getElementById('detailReference').textContent = '#' + ref;
+        document.getElementById('detailDate').textContent = date;
+        document.getElementById('detailClient').textContent = clientNom;
+        document.getElementById('detailEmail').textContent = clientEmail;
+        document.getElementById('detailStatut').innerHTML = '<span class="badge ' + statutBadge + '">' + (STATUT_LABELS[c.statut] || c.statut) + '</span>';
+
+        document.getElementById('detailProduits').innerHTML = (c.lignes || []).map(l => `
+          <div class="detail-produit-ligne">
+            <span>${l.nom_produit} <span style="color:var(--text-muted)">x${l.quantite}</span></span>
+            <span style="color:var(--blue-400);font-weight:500">${(l.prix_unitaire * l.quantite).toFixed(2)}FBU</span>
+          </div>
+        `).join('');
+        document.getElementById('detailTotal').textContent = c.montant_total.toFixed(2) + 'FBU';
+
+        // Statut selector
+        const select = document.getElementById('changeStatutSelect');
+        const transitions = STATUT_TRANSITIONS[c.statut] || [];
+        if (transitions.length > 0) {
+          document.getElementById('statutChangeArea').style.display = 'flex';
+          select.innerHTML = transitions.map(s => `<option value="${s}">${STATUT_LABELS[s]}</option>`).join('');
+          select.dataset.targetId = c._id;
+        } else {
+          document.getElementById('statutChangeArea').style.display = 'none';
+        }
+
+        // Timeline
+        const historique = c.historique_statuts || [{ statut: c.statut, date: c.updatedAt || c.createdAt, _initial: true }];
+        const timelineContainer = document.getElementById('timelineContent');
+        const icones = {
+          en_attente: 'fa-clock',
+          confirmee: 'fa-check',
+          expediee: 'fa-truck',
+          livree: 'fa-home',
+          annulee: 'fa-times'
+        };
+        const classes = {
+          en_attente: 'pending',
+          confirmee: 'confirmed',
+          expediee: 'shipped',
+          livree: 'delivered',
+          annulee: 'cancelled'
+        };
+        const etiquettes = {
+          en_attente: 'En attente',
+          confirmee: 'Confirmée',
+          expediee: 'Expédiée',
+          livree: 'Livrée',
+          annulee: 'Annulée'
+        };
+        if (timelineContainer) {
+          timelineContainer.innerHTML = historique.map(h => {
+            const d = new Date(h.date);
+            const dateStr = d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' });
+            const timeStr = d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+            return `
+              <div class="timeline-item">
+                <div class="timeline-dot ${classes[h.statut] || 'pending'}">
+                  <i class="fas ${icones[h.statut] || 'fa-circle'}"></i>
+                </div>
+                <div class="timeline-content">
+                  <div class="label">${etiquettes[h.statut] || h.statut}</div>
+                  <div class="time">${dateStr} à ${timeStr}</div>
+                </div>
+              </div>
+            `;
+          }).join('');
+        }
+
+        ouvrirModal('modalCommande');
+      } catch (e) {}
+    }
+
+    async function changerStatutCommande() {
+      const select = document.getElementById('changeStatutSelect');
+      const id = select.dataset.targetId;
+      const statut = select.value;
+
+      try {
+        const res = await fetch(API + '/commandes/' + id + '/statut', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + getToken() },
+          body: JSON.stringify({ statut })
+        });
+        const data = await res.json();
+        if (data.success) {
+          fermerModal('modalCommande');
+          chargerCommandesAdmin();
+        } else {
+          alert(data.message);
+        }
+      } catch (e) {}
+    }
+  </script>
+</body>
+</html>

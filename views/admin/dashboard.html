@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>StockPro — Tableau de bord</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+  <link rel="stylesheet" href="/css/style.css">
+  <link rel="stylesheet" href="/css/admin.css">
+  <script src="/js/theme.js"></script>
+  <style>
+    .charts-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 20px; }
+    .chart-card { background: var(--bg-700); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 16px; }
+    .chart-card canvas { max-height: 260px; }
+    .alertes-list { background: var(--bg-700); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 16px; }
+    .alerte-item { display: flex; align-items: center; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid var(--border); }
+    .alerte-item:last-child { border-bottom: none; }
+    .alerte-item .produit-nom { font-size: 14px; font-weight: 500; }
+    .alerte-item .stock-info { font-size: 12px; }
+    @media (max-width: 768px) {
+      .charts-row { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body data-page="dashboard">
+  <div class="page-wrapper">
+    <div id="adminSidebar"></div>
+    <div class="main-content">
+      <div class="flex items-center justify-between mb-2">
+        <h1><i class="fas fa-chart-line"></i> Tableau de bord</h1>
+        <button class="btn btn-secondary btn-sm" onclick="actualiserStats()"><i class="fas fa-sync-alt"></i> Actualiser</button>
+      </div>
+
+      <div class="metrics-grid" id="statsGrid">
+        <div style="grid-column:1/-1;text-align:center;padding:40px;color:var(--text-muted)">
+          <i class="fas fa-spinner fa-spin" style="font-size:28px"></i>
+          <p style="margin-top:12px">Chargement...</p>
+        </div>
+      </div>
+
+      <div class="charts-row">
+        <div class="chart-card">
+          <h3 style="margin-bottom:12px"><i class="fas fa-chart-pie"></i> Commandes par statut</h3>
+          <canvas id="chartCommandes"></canvas>
+        </div>
+        <div class="chart-card">
+          <h3 style="margin-bottom:12px"><i class="fas fa-chart-bar"></i> Produits les plus vendus</h3>
+          <canvas id="chartProduits"></canvas>
+        </div>
+      </div>
+
+      <div class="alertes-list">
+        <div class="card-header">
+          <span class="card-title"><i class="fas fa-bell"></i> Alertes stock actives</span>
+          <span class="badge badge-pending" id="alertesActives">0</span>
+        </div>
+        <div id="alertesList">
+          <p style="text-align:center;color:var(--text-muted);padding:20px">Aucune alerte active.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="/js/auth.js"></script>
+  <script src="/js/navbar.js"></script>
+  <script src="/js/admin.js"></script>
+  <script>
+    const STATUT_LABELS = {
+      en_attente: 'En attente',
+      confirmee: 'Confirmée',
+      expediee: 'Expédiée',
+      livree: 'Livrée',
+      annulee: 'Annulée'
+    };
+
+    document.addEventListener('DOMContentLoaded', () => {
+      verifierAuth();
+      chargerDashboard();
+    });
+
+    function verifierAuth() {
+      const token = localStorage.getItem('token');
+      if (!token) { window.location.href = '/views/auth/login.html'; return; }
+      try {
+        const user = JSON.parse(localStorage.getItem('user'));
+        if (!user || user.role !== 'admin') { window.location.href = '/views/produits/catalogue.html'; }
+      } catch (e) { window.location.href = '/views/auth/login.html'; }
+    }
+
+    async function chargerDashboard() {
+      const token = getToken();
+      if (!token) return;
+
+      try {
+        const res = await fetch(API + '/dashboard/stats', {
+          headers: { 'Authorization': 'Bearer ' + token }
+        });
+        const data = await res.json();
+
+        if (data.success) {
+          const s = data.data;
+          document.getElementById('statsGrid').innerHTML = `
+            <div class="metric-card">
+              <div class="metric-label"><i class="fas fa-euro-sign"></i> Chiffre d'affaires</div>
+              <div class="metric-value">${(s.chiffreAffaires || 0).toFixed(2)}FBU</div>
+              <div class="metric-sub up">${s.commandes.total} commandes</div>
+            </div>
+            <div class="metric-card">
+              <div class="metric-label"><i class="fas fa-shopping-bag"></i> Produits vendus</div>
+              <div class="metric-value">${s.produitsVendus || 0}</div>
+              <div class="metric-sub">${s.stock.totalProduits} au catalogue</div>
+            </div>
+            <div class="metric-card">
+              <div class="metric-label"><i class="fas fa-exclamation-triangle"></i> Alertes actives</div>
+              <div class="metric-value">${s.stock.alerteActive}</div>
+              <div class="metric-sub warn">À réapprovisionner</div>
+            </div>
+            <div class="metric-card">
+              <div class="metric-label"><i class="fas fa-users"></i> Clients</div>
+              <div class="metric-value">${s.clients}</div>
+              <div class="metric-sub">Comptes clients actifs</div>
+            </div>
+          `;
+
+          document.getElementById('alertesActives').textContent = s.stock.alerteActive + ' active' + (s.stock.alerteActive > 1 ? 's' : '');
+
+          const alertesContainer = document.getElementById('alertesList');
+          if (s.stock.produitsFaibleStock && s.stock.produitsFaibleStock.length > 0) {
+            alertesContainer.innerHTML = s.stock.produitsFaibleStock.map(p => `
+              <div class="alerte-item">
+                <div>
+                  <div class="produit-nom">${p.nom}</div>
+                  <div class="stock-info text-muted">Stock: ${p.stock} / Seuil: ${p.seuil_alerte}</div>
+                </div>
+                <span class="badge ${p.stock === 0 ? 'badge-stock-out' : 'badge-stock-low'}">${p.stock === 0 ? 'Rupture' : 'Stock faible'}</span>
+              </div>
+            `).join('');
+          } else {
+            alertesContainer.innerHTML = '<p style="text-align:center;color:var(--text-muted);padding:20px"><i class="fas fa-check-circle" style="color:var(--green-400)"></i> Aucune alerte active.</p>';
+          }
+
+          if (window.Chart) {
+            const ctx1 = document.getElementById('chartCommandes');
+            if (ctx1) {
+              new Chart(ctx1, {
+                type: 'doughnut',
+                data: {
+                  labels: Object.keys(s.commandes.parStatut).map(k => STATUT_LABELS[k] || k),
+                  datasets: [{
+                    data: Object.values(s.commandes.parStatut),
+                    backgroundColor: ['#30363D', '#58A6FF', '#D29922', '#3FB950', '#F85149'],
+                    borderWidth: 0
+                  }]
+                },
+                options: { responsive: true, plugins: { legend: { position: 'bottom', labels: { color: '#8B949E' } } } }
+              });
+            }
+
+            const ctx2 = document.getElementById('chartProduits');
+            if (ctx2 && s.stock.produitsFaibleStock && s.stock.produitsFaibleStock.length > 0) {
+              const alertes = s.stock.produitsFaibleStock.slice(0, 8);
+              new Chart(ctx2, {
+                type: 'bar',
+                data: {
+                  labels: alertes.map(p => p.nom),
+                  datasets: [{
+                    label: 'Stock actuel',
+                    data: alertes.map(p => p.stock),
+                    backgroundColor: alertes.map(p => p.stock === 0 ? '#F85149' : '#D29922'),
+                    borderRadius: 6
+                  }]
+                },
+                options: {
+                  responsive: true,
+                  plugins: { legend: { display: false } },
+                  scales: {
+                    y: { beginAtZero: true, ticks: { stepSize: 1, color: '#8B949E' }, grid: { color: '#30363D' } },
+                    x: { ticks: { color: '#8B949E' }, grid: { display: false } }
+                  }
+                }
+              });
+            }
+          }
+        }
+      } catch (e) {}
+    }
+
+    function actualiserStats() { chargerDashboard(); }
+    function getToken() { return localStorage.getItem('token'); }
+  </script>
+</body>
+</html>
