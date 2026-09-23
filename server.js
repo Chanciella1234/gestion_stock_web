@@ -16,6 +16,7 @@ app.use('/views', express.static('views'));
 
 app.use('/api/auth', require('./routes/authRoutes'));
 app.use('/api/produits', require('./routes/produitRoutes'));
+app.use('/api/fournisseurs', require('./routes/supplierSyncRoutes'));
 app.use('/api/categories', require('./routes/categorieRoutes'));
 app.use('/api/panier', require('./routes/panierRoutes'));
 app.use('/api/commandes', require('./routes/commandeRoutes'));

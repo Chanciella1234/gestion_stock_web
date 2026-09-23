@@ -48,6 +48,35 @@ const produitSchema = new mongoose.Schema({
   nb_avis: {
     type: Number,
     default: 0
+  },
+  sku: {
+    type: String,
+    unique: true,
+    sparse: true,
+    trim: true
+  },
+  prix_achat: {
+    type: Number,
+    min: [0, 'Le prix d\'achat ne peut pas être négatif']
+  },
+  delai_livraison_jours: {
+    type: Number,
+    min: [0, 'Le délai de livraison ne peut pas être négatif']
+  },
+  stock_fournisseur: {
+    type: Number,
+    min: [0, 'Le stock fournisseur ne peut pas être négatif']
+  },
+  fournisseur_code: {
+    type: String,
+    trim: true
+  },
+  fournisseur_nom: {
+    type: String,
+    trim: true
+  },
+  derniere_synchro_fournisseur: {
+    type: Date
   }
 }, {
   timestamps: true,
