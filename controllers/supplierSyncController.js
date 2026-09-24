@@ -1,6 +1,7 @@
 const Produit = require('../models/Produit');
 const { fetchSupplierCatalog } = require('../utils/supplierSoapClient');
 const { success, error } = require('../utils/apiResponse');
+const { echapperRegex } = require('../utils/stringUtils');
 
 exports.synchroniser = async (req, res, next) => {
   try {
@@ -12,7 +13,7 @@ exports.synchroniser = async (req, res, next) => {
 
     for (const item of catalogue.products) {
       const produit = await Produit.findOne({
-        nom: { $regex: `^${item.productName}$`, $options: 'i' }
+        nom: { $regex: `^${echapperRegex(item.productName)}$`, $options: 'i' }
       });
 
       if (!produit) {

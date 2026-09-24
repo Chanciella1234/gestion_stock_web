@@ -37,7 +37,11 @@ async function fetchSupplierCatalog(supplierId) {
     }
     if (err.root?.Envelope?.Body?.Fault) {
       const fault = err.root.Envelope.Body.Fault;
-      throw { code: 'SUPPLIER_NOT_FOUND', message: fault.faultstring || 'Fournisseur introuvable' };
+      const rawMessage = fault.faultstring;
+      const message = typeof rawMessage === 'string'
+        ? rawMessage
+        : (rawMessage?.$value || 'Fournisseur introuvable');
+      throw { code: 'SUPPLIER_NOT_FOUND', message };
     }
     throw { code: 'SOAP_ERROR', message: err.message || 'Erreur SOAP inconnue' };
   }
